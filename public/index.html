@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#104c60">
+  <title>PikaFit · Acceso y pases médicos</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand"><span class="mark">P</span><span><strong>PikaFit</strong><small>Acceso, roles y pases médicos</small></span></div>
+    <div id="session-actions" class="session-actions" hidden><span id="session-name"></span><button id="logout" class="button ghost" type="button">Cerrar sesión</button></div>
+  </header>
+
+  <main class="container">
+    <section id="login-panel" class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Proyecto Integrador</p>
+        <h1>Tu acceso a PikaFit, en un solo lugar.</h1>
+        <p>Consulta tu membresía, genera un pase temporal para la clínica y gestiona el acceso según tu rol.</p>
+        <div class="feature-list"><span>Acceso protegido</span><span>Pases de un solo uso</span><span>Permisos por rol</span></div>
+      </div>
+      <form id="login-form" class="card form-card">
+        <h2>Iniciar sesión</h2>
+        <p class="muted">Usa tu correo o DNI junto con tu contraseña.</p>
+        <label>Correo o DNI<input name="identifier" autocomplete="username" required placeholder="nombre@ejemplo.com o 12345678"></label>
+        <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="button primary" type="submit">Entrar</button>
+        <p id="login-message" class="message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="page-heading"><div><p class="eyebrow">Panel personal</p><h1 id="dashboard-title">Bienvenido</h1><p id="dashboard-subtitle" class="muted"></p></div><span id="role-pill" class="pill"></span></div>
+      <div id="dashboard-message" class="message" role="status"></div>
+
+      <section id="member-panel" class="card panel" hidden>
+        <div class="section-heading"><div><h2>Tu membresía y pase médico</h2><p id="membership-message" class="muted"></p></div><button id="create-pass" class="button primary" type="button">Generar pase</button></div>
+        <div id="pass-result" class="pass-card" hidden><img id="pass-qr" alt="Código QR temporal para la clínica"><div><p class="eyebrow">Código alternativo</p><strong id="pass-code" class="pass-code"></strong><p id="pass-expiry" class="muted"></p><p class="fine-print">Muestra el QR o el código a recepción. Se podrá usar una sola vez.</p></div></div>
+      </section>
+
+      <section id="admin-panel" class="panel-grid" hidden>
+        <form id="create-user-form" class="card panel">
+          <h2>Crear cuenta</h2><p class="muted">El administrador registra socios y personal.</p>
+          <label>Nombre<input name="name" required></label><label>Correo<input name="email" type="email" required></label>
+          <label>DNI del socio<input name="dni" inputmode="numeric" maxlength="8" placeholder="Opcional"></label>
+          <label>Contraseña inicial<input name="password" type="password" minlength="12" required></label>
+          <label>Rol<select name="role" id="new-user-role"></select></label>
+          <label>Clínica asociada<input name="clinicId" placeholder="Obligatorio para recepción y administración de clínica"></label>
+          <label>Vencimiento de membresía<input name="membershipExpiresAt" type="date"></label>
+          <button class="button primary" type="submit">Crear usuario</button><p id="create-user-message" class="message" role="status"></p>
+        </form>
+        <div class="card panel"><h2>Usuarios y roles</h2><div id="users-list" class="list"></div></div>
+      </section>
+
+      <section id="audit-panel" class="card panel" hidden><h2>Auditoría de roles</h2><div id="audit-list" class="list"></div></section>
+
+      <section id="reception-panel" class="panel-grid" hidden>
+        <form id="validate-form" class="card panel"><h2>Validar pase</h2><p class="muted">Ingresa el código de seis caracteres o el valor leído del QR.</p><label>Código o QR<input name="value" required autocomplete="off"></label><button class="button primary" type="submit">Validar</button><p id="validation-message" class="message" role="status"></p></form>
+        <div class="card panel"><h2>Escanear QR</h2><p class="muted">Activa la cámara para leer el pase del socio.</p><button id="start-camera" class="button secondary" type="button">Abrir cámara</button><button id="stop-camera" class="button ghost" type="button" hidden>Cerrar cámara</button><video id="camera" autoplay playsinline hidden></video><p id="camera-message" class="message" role="status"></p></div>
+      </section>
+
+      <section id="clinic-admin-panel" class="card panel" hidden><h2>Historial de pases validados</h2><div class="filters"><label>Desde<input id="history-from" type="date"></label><label>Hasta<input id="history-to" type="date"></label><button id="load-history" class="button secondary" type="button">Consultar</button></div><div id="history-list" class="list"></div></section>
+    </section>
+  </main>
+  <footer>Proyecto Integrador · PikaFit</footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>
+
