@@ -2,9 +2,6 @@ package com.pikafit.mobile
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Canvas
 import android.os.Bundle
 import android.util.Base64
 import androidx.activity.ComponentActivity
@@ -13,7 +10,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,18 +43,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import java.time.Duration
+import java.time.Instant
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val prefs = getSharedPreferences("pikafit_session", MODE_PRIVATE)
+        val sessionStore = SessionStore(applicationContext)
         setContent {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     PikaFitApp(
-                        initialToken = prefs.getString("token", null),
-                        onSaveToken = { token -> prefs.edit().putString("token", token).apply() },
-                        onClearToken = { prefs.edit().remove("token").apply() },
+                        initialToken = sessionStore.read(),
+                        onSaveToken = sessionStore::save,
+                        onClearToken = sessionStore::clear,
                     )
                 }
             }
@@ -183,6 +184,16 @@ private fun MemberCard(
     onLogout: () -> Unit,
 ) {
     val isActiveMember = user.role == "SOCIO" && user.membershipActive == true
+    var secondsRemaining by remember(pass?.expiresAt) {
+        mutableLongStateOf(pass?.let { secondsUntil(it.expiresAt) } ?: 0L)
+    }
+    val currentPass = pass
+    LaunchedEffect(currentPass?.expiresAt) {
+        while (currentPass != null && secondsRemaining > 0) {
+            delay(1_000)
+            secondsRemaining = secondsUntil(currentPass.expiresAt)
+        }
+    }
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Hola, ${user.name}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -193,11 +204,15 @@ private fun MemberCard(
                     if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("Generar pase médico")
                 }
                 pass?.let { passResult ->
-                    Spacer(Modifier.height(4.dp))
-                    QrImage(passResult.qrDataUrl)
-                    Text("Código alternativo", style = MaterialTheme.typography.labelLarge)
-                    Text(passResult.code, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text("Vence: ${passResult.expiresAt}", style = MaterialTheme.typography.bodySmall)
+                    if (secondsRemaining > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        QrImage(passResult.qrDataUrl)
+                        Text("Código alternativo", style = MaterialTheme.typography.labelLarge)
+                        Text(passResult.code, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text("El pase vence en ${secondsRemaining / 60}:${(secondsRemaining % 60).toString().padStart(2, '0')}", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        Text("El pase venció. Genera uno nuevo para continuar.", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             } else if (user.role == "SOCIO") {
                 Text("Tu membresía está vencida. Debes renovarla para generar un pase.", color = MaterialTheme.colorScheme.error)
@@ -216,51 +231,12 @@ private fun QrImage(dataUrl: String) {
         runCatching {
             val encoded = dataUrl.substringAfter("base64,")
             val bytes = Base64.decode(encoded, Base64.DEFAULT)
-            val qrPng = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            if (qrPng != null) qrPng else buildQrFromToken(dataUrl)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         }.getOrNull()
     }
     bitmap?.let { Image(it.asImageBitmap(), contentDescription = "Código QR del pase médico", modifier = Modifier.size(210.dp)) }
 }
 
-private fun buildQrFromToken(data: String): Bitmap {
-    val token = data.substringAfter("base64,", data)
-    val gridSize = 29
-    val matrix = Array(gridSize) { BooleanArray(gridSize) }
-    val reserved = Array(gridSize) { BooleanArray(gridSize) }
-    fun finder(left: Int, top: Int) {
-        for (y in -1..7) for (x in -1..7) {
-            val px = left + x; val py = top + y
-            if (px !in 0 until gridSize || py !in 0 until gridSize) continue
-            reserved[py][px] = true
-            matrix[py][px] = x in 0..6 && y in 0..6 &&
-                (x == 0 || x == 6 || y == 0 || y == 6 || (x in 2..4 && y in 2..4))
-        }
-    }
-    finder(0, 0); finder(gridSize - 7, 0); finder(0, gridSize - 7)
-    val payload = token.toByteArray(Charsets.UTF_8)
-    var bit = 0
-    for (x in gridSize - 1 downTo 1 step 2) {
-        val col = if (x == 6) x - 1 else x
-        for (y in 0 until gridSize) {
-            val row = if (((gridSize - 1 - col) / 2) % 2 == 0) gridSize - 1 - y else y
-            for (dx in 0..1) {
-                val px = col - dx
-                if (!reserved[row][px]) {
-                    val value = if (payload.isEmpty()) 0 else payload[(bit / 8) % payload.size].toInt()
-                    matrix[row][px] = ((value ushr (7 - (bit % 8))) and 1) == 1
-                    bit++
-                }
-            }
-        }
-    }
-    val scale = 8
-    val bitmap = Bitmap.createBitmap(gridSize * scale, gridSize * scale, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    canvas.drawColor(Color.WHITE)
-    val paint = Paint().apply { color = Color.BLACK; style = Paint.Style.FILL }
-    for (y in 0 until gridSize) for (x in 0 until gridSize) if (matrix[y][x]) {
-        canvas.drawRect((x * scale).toFloat(), (y * scale).toFloat(), ((x + 1) * scale).toFloat(), ((y + 1) * scale).toFloat(), paint)
-    }
-    return bitmap
-}
+private fun secondsUntil(expiresAt: String): Long = runCatching {
+    Duration.between(Instant.now(), Instant.parse(expiresAt)).seconds.coerceAtLeast(0)
+}.getOrDefault(0)
