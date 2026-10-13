@@ -6,3 +6,11 @@ dist/
 .local-mongo/
 .local-mongo-test/
 
+.gradle-home/
+**/build/
+local.properties
+Android/.gradle/
+Android/.idea/
+.idea/
+.kotlin/
+.gradle/

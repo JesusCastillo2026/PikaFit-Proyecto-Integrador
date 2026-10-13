@@ -109,10 +109,10 @@ app.get('/api/clinic/passes/history', authenticate, requireRole('ADMIN_CLINICA')
   res.json(await history({ clinicId: req.user.clinicId, from, to, page }));
 }));
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'Web')));
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next(new HttpError(404, 'Ruta no encontrada', 'not_found'));
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'Web', 'index.html'));
 });
 app.use((err, _req, res, _next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {

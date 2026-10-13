@@ -74,7 +74,8 @@ async function refreshDashboard() {
 
 $('login-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const fields = new FormData(event.currentTarget);
+  const form = event.currentTarget;
+  const fields = new FormData(form);
   const identifier = String(fields.get('identifier') || '').trim();
   const payload = /^\d{8}$/.test(identifier)
     ? { dni: identifier, password: fields.get('password') }
@@ -83,7 +84,7 @@ $('login-form').addEventListener('submit', async event => {
     const result = await api('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) });
     token = result.token;
     sessionStorage.setItem('pikafit_token', token);
-    event.currentTarget.reset();
+    form.reset();
     message('login-message', '');
     await refreshDashboard();
   } catch (error) { message('login-message', error.message, true); }
@@ -141,12 +142,13 @@ async function loadUsers() {
 
 $('create-user-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const data = Object.fromEntries(new FormData(event.currentTarget));
+  const form = event.currentTarget;
+  const data = Object.fromEntries(new FormData(form));
   for (const key of ['dni', 'clinicId', 'membershipExpiresAt']) if (!data[key]) delete data[key];
   try {
     const { user } = await api('/api/users', { method: 'POST', body: JSON.stringify(data) });
     message('create-user-message', `Cuenta de ${user.name} creada.`);
-    event.currentTarget.reset();
+    form.reset();
     await loadUsers();
   } catch (error) { message('create-user-message', error.message, true); }
 });
@@ -165,12 +167,13 @@ async function loadAudit() {
 
 $('validate-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const value = String(new FormData(event.currentTarget).get('value') || '').trim();
+  const form = event.currentTarget;
+  const value = String(new FormData(form).get('value') || '').trim();
   const payload = value.length === 6 ? { code: value } : { token: value };
   try {
     await api('/api/clinic/passes/validate', { method: 'POST', body: JSON.stringify(payload) });
     message('validation-message', 'Pase válido: socio apto para atención.');
-    event.currentTarget.reset();
+    form.reset();
   } catch (error) { message('validation-message', error.message, true); }
 });
 
