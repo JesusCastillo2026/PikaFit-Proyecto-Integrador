@@ -19,6 +19,10 @@ async function connect() {
     db.collection('medical_passes').createIndex({ retentionUntil: 1 }, { expireAfterSeconds: 0 }),
     db.collection('medical_passes').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('medical_passes').createIndex({ clinicId: 1, usedAt: -1 }),
+    db.collection('users').createIndex({ role: 1, clinicId: 1, membershipExpiresAt: 1 }),
+    db.collection('membership_notifications').createIndex({ memberId: 1, membershipExpiresAt: 1 }, { unique: true }),
+    db.collection('membership_notifications').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('medical_evaluations').createIndex({ clinicId: 1, createdAt: 1 }),
   ]);
   return db;
 }

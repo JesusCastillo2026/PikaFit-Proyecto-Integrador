@@ -38,6 +38,7 @@
       <section id="member-panel" class="card panel" hidden>
         <div class="section-heading"><div><h2>Tu membresía y pase médico</h2><p id="membership-message" class="muted"></p></div><button id="create-pass" class="button primary" type="button">Generar pase</button></div>
         <div id="pass-result" class="pass-card" hidden><img id="pass-qr" alt="Código QR temporal para la clínica"><div><p class="eyebrow">Código alternativo</p><strong id="pass-code" class="pass-code"></strong><p id="pass-expiry" class="muted"></p><p class="fine-print">Muestra el QR o el código a recepción. Se podrá usar una sola vez.</p></div></div>
+        <div class="notice-box"><h3>Avisos de membresía</h3><div id="member-notifications" class="list"><p class="muted">No tienes avisos próximos.</p></div></div>
       </section>
 
       <section id="admin-panel" class="panel-grid" hidden>
@@ -61,7 +62,29 @@
         <div class="card panel"><h2>Escanear QR</h2><p class="muted">Activa la cámara para leer el pase del socio.</p><button id="start-camera" class="button secondary" type="button">Abrir cámara</button><button id="stop-camera" class="button ghost" type="button" hidden>Cerrar cámara</button><video id="camera" autoplay playsinline hidden></video><p id="camera-message" class="message" role="status"></p></div>
       </section>
 
-      <section id="clinic-admin-panel" class="card panel" hidden><h2>Historial de pases validados</h2><div class="filters"><label>Desde<input id="history-from" type="date"></label><label>Hasta<input id="history-to" type="date"></label><button id="load-history" class="button secondary" type="button">Consultar</button></div><div id="history-list" class="list"></div></section>
+      <section id="clinic-admin-panel" hidden>
+        <section class="card panel">
+          <h2>Historial de pases validados</h2>
+          <div class="filters"><label>Desde<input id="history-from" type="date"></label><label>Hasta<input id="history-to" type="date"></label><button id="load-history" class="button secondary" type="button">Consultar</button></div>
+          <div id="history-list" class="list"></div>
+        </section>
+        <section class="card panel">
+          <h2>Membresías próximas a vencer</h2>
+          <p class="muted">Consulta socios de tu clínica y su estado de membresía.</p>
+          <div class="filters"><label>Próximos días<input id="expiry-days" type="number" min="1" max="90" value="30"></label><button id="load-expiring" class="button secondary" type="button">Consultar</button></div>
+          <div id="expiring-list" class="list"></div>
+        </section>
+        <section class="card panel">
+          <div class="section-heading"><div><h2>Reporte mensual</h2><p class="muted">Actividad consolidada de la clínica.</p></div><button id="download-monthly-report" class="button secondary" type="button">Descargar CSV</button></div>
+          <div class="filters"><label>Mes<input id="report-month" type="month"></label><button id="load-monthly-report" class="button secondary" type="button">Consultar</button></div>
+          <div class="summary-grid" aria-live="polite">
+            <article><span>Evaluaciones médicas</span><strong id="monthly-evaluations">—</strong></article>
+            <article><span>Pases validados</span><strong id="monthly-passes">—</strong></article>
+            <article><span>Actividad total</span><strong id="monthly-total">—</strong></article>
+          </div>
+          <p id="monthly-report-message" class="message" role="status"></p>
+        </section>
+      </section>
     </section>
   </main>
   <footer>Proyecto Integrador · PikaFit</footer>

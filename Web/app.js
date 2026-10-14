@@ -64,7 +64,12 @@ async function refreshDashboard() {
     renderUser(user);
     if (user.role === 'ADMIN') await loadUsers();
     if (['ADMIN', 'AUDITOR'].includes(user.role)) await loadAudit();
-    if (user.role === 'ADMIN_CLINICA') await loadHistory();
+    if (user.role === 'ADMIN_CLINICA') {
+      await loadHistory();
+      await loadExpiringMemberships();
+      await loadMonthlyReport();
+    }
+    if (user.role === 'SOCIO') await loadMemberNotifications();
   } catch {
     token = null;
     sessionStorage.removeItem('pikafit_token');
@@ -231,5 +236,73 @@ async function loadHistory() {
   }
 }
 $('load-history').addEventListener('click', () => loadHistory().catch(error => message('dashboard-message', error.message, true)));
+
+async function loadMemberNotifications() {
+  const { items } = await api('/api/me/notifications');
+  const container = $('member-notifications');
+  container.replaceChildren();
+  if (!items.length) return container.append(element('p', 'muted', 'No tienes avisos próximos.'));
+  for (const item of items) {
+    const row = element('div', 'list-item');
+    const info = element('div');
+    info.append(element('strong', '', item.title), element('small', '', item.message));
+    row.append(info, element('small', '', new Date(item.createdAt).toLocaleDateString('es-PE')));
+    container.append(row);
+  }
+}
+
+async function loadExpiringMemberships() {
+  const days = $('expiry-days').value || '30';
+  const { items, periodDays } = await api(`/api/clinic/memberships/expiring?days=${encodeURIComponent(days)}`);
+  const container = $('expiring-list');
+  container.replaceChildren();
+  if (!items.length) return container.append(element('p', 'muted', `No hay membresías próximas a vencer en los siguientes ${periodDays} días.`));
+  for (const member of items) {
+    const row = element('div', 'list-item');
+    const info = element('div');
+    info.append(element('strong', '', member.name), element('small', '', `${member.email} · ${member.membershipState}`));
+    const expiry = new Date(member.membershipExpiresAt).toLocaleDateString('es-PE');
+    row.append(info, element('small', '', `Vence ${expiry} · ${member.daysRemaining} días`));
+    container.append(row);
+  }
+}
+
+async function loadMonthlyReport() {
+  const month = $('report-month').value;
+  if (!month) return;
+  const report = await api(`/api/clinic/reports/monthly?month=${encodeURIComponent(month)}`);
+  $('monthly-evaluations').textContent = report.evaluations;
+  $('monthly-passes').textContent = report.validatedPasses;
+  $('monthly-total').textContent = report.totalActivity;
+  message('monthly-report-message', `Reporte de ${report.month} actualizado.`);
+}
+
+async function downloadMonthlyReport() {
+  const month = $('report-month').value;
+  if (!month) return message('monthly-report-message', 'Selecciona un mes para descargar el reporte.', true);
+  try {
+    const response = await fetch(`/api/clinic/reports/monthly.csv?month=${encodeURIComponent(month)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      let result = {};
+      try { result = await response.json(); } catch { /* Respuesta sin JSON. */ }
+      throw new Error(result.error || 'No se pudo descargar el reporte');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pikafit-reporte-${month}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    message('monthly-report-message', 'Reporte CSV descargado.');
+  } catch (error) { message('monthly-report-message', error.message, true); }
+}
+
+$('load-expiring').addEventListener('click', () => loadExpiringMemberships().catch(error => message('dashboard-message', error.message, true)));
+$('load-monthly-report').addEventListener('click', () => loadMonthlyReport().catch(error => message('monthly-report-message', error.message, true)));
+$('download-monthly-report').addEventListener('click', downloadMonthlyReport);
+$('report-month').value = new Date().toISOString().slice(0, 7);
 
 refreshDashboard();

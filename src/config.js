@@ -21,5 +21,6 @@ module.exports = {
   lockMaxAttempts: positiveInteger('LOCK_MAX_ATTEMPTS', 5),
   lockMinutes: positiveInteger('LOCK_MINUTES', 15),
   passMinutes: positiveInteger('PASS_MINUTES', 10),
+  membershipNoticeDays: positiveInteger('MEMBERSHIP_NOTICE_DAYS', 7),
 };
 

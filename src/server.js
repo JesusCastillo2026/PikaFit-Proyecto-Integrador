@@ -6,6 +6,8 @@ const { HttpError, asyncRoute, text, dateOrNull } = require('./http');
 const { login, authenticate, requireRole, activeMembership } = require('./auth');
 const { ROLES, createUser, publicUser, userId } = require('./users');
 const { createPass, validatePass, history } = require('./passes');
+const { notificationsForMember, startMembershipNoticeScheduler } = require('./membership-notices');
+const { expiringMemberships, monthlyClinicSummary, summaryCsv } = require('./clinic-reports');
 
 const app = express();
 app.disable('x-powered-by');
@@ -27,6 +29,9 @@ app.post('/api/auth/login', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/me', authenticate, (req, res) => res.json({ user: publicUser(req.user) }));
+app.get('/api/me/notifications', authenticate, asyncRoute(async (req, res) => {
+  res.json({ items: await notificationsForMember(req.user._id) });
+}));
 app.get('/api/roles', authenticate, requireRole('ADMIN'), (_req, res) => res.json({ roles: ROLES }));
 
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
@@ -109,6 +114,22 @@ app.get('/api/clinic/passes/history', authenticate, requireRole('ADMIN_CLINICA')
   res.json(await history({ clinicId: req.user.clinicId, from, to, page }));
 }));
 
+app.get('/api/clinic/memberships/expiring', authenticate, requireRole('ADMIN_CLINICA'), asyncRoute(async (req, res) => {
+  if (!req.user.clinicId) throw new HttpError(403, 'Tu cuenta no está asociada con una clínica', 'clinic_required');
+  res.json(await expiringMemberships({ clinicId: req.user.clinicId, days: req.query.days }));
+}));
+
+app.get('/api/clinic/reports/monthly', authenticate, requireRole('ADMIN_CLINICA'), asyncRoute(async (req, res) => {
+  if (!req.user.clinicId) throw new HttpError(403, 'Tu cuenta no está asociada con una clínica', 'clinic_required');
+  res.json(await monthlyClinicSummary({ clinicId: req.user.clinicId, month: req.query.month }));
+}));
+
+app.get('/api/clinic/reports/monthly.csv', authenticate, requireRole('ADMIN_CLINICA'), asyncRoute(async (req, res) => {
+  if (!req.user.clinicId) throw new HttpError(403, 'Tu cuenta no está asociada con una clínica', 'clinic_required');
+  const summary = await monthlyClinicSummary({ clinicId: req.user.clinicId, month: req.query.month });
+  res.type('text/csv; charset=utf-8').attachment(`pikafit-reporte-${summary.month}.csv`).send(summaryCsv(summary));
+}));
+
 app.use(express.static(path.join(__dirname, '..', 'Web')));
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next(new HttpError(404, 'Ruta no encontrada', 'not_found'));
@@ -125,8 +146,9 @@ app.use((err, _req, res, _next) => {
 
 if (require.main === module) {
   connect().then(() => {
+    const reminderTimer = startMembershipNoticeScheduler();
     const server = app.listen(config.port, () => console.log(`PikaFit disponible en http://localhost:${config.port}`));
-    const shutdown = async () => { server.close(); await close(); };
+    const shutdown = async () => { clearInterval(reminderTimer); server.close(); await close(); };
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
   }).catch(error => { console.error(error); process.exitCode = 1; });
