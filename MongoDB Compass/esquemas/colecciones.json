@@ -1,0 +1,93 @@
+{
+  "database": "pikafit_jesus",
+  "collections": [
+    {
+      "name": "users",
+      "purpose": "Socios, administradores y personal",
+      "fields": {
+        "name": "string",
+        "email": "string",
+        "dni": "string (opcional, 8 dígitos)",
+        "role": ["SOCIO", "ADMIN", "ADMIN_B2B", "MEDICO", "COACH", "RECEPCION_CLINICA", "ADMIN_CLINICA", "AUDITOR"],
+        "passwordHash": "string (hash; nunca guardar contraseña en texto plano)",
+        "clinicId": "string | null",
+        "membershipExpiresAt": "date | null",
+        "failedAttempts": "integer",
+        "lockedUntil": "date | null",
+        "tokenVersion": "integer",
+        "createdAt": "date",
+        "updatedAt": "date"
+      },
+      "indexes": [
+        { "keys": { "email": 1 }, "unique": true },
+        { "keys": { "dni": 1 }, "unique": true, "sparse": true },
+        { "keys": { "role": 1 } },
+        { "keys": { "role": 1, "clinicId": 1, "membershipExpiresAt": 1 } }
+      ]
+    },
+    {
+      "name": "medical_passes",
+      "purpose": "Pases médicos temporales y validación de un solo uso",
+      "fields": {
+        "tokenDigest": "string",
+        "codeDigest": "string",
+        "memberId": "ObjectId",
+        "createdAt": "date",
+        "expiresAt": "date",
+        "retentionUntil": "date (TTL mientras no se valida)",
+        "usedAt": "date | null",
+        "clinicId": "string | null",
+        "validatedBy": "ObjectId | null"
+      },
+      "indexes": [
+        { "keys": { "tokenDigest": 1 }, "unique": true },
+        { "keys": { "codeDigest": 1 }, "unique": true },
+        { "keys": { "retentionUntil": 1 }, "expireAfterSeconds": 0 },
+        { "keys": { "memberId": 1, "createdAt": -1 } },
+        { "keys": { "clinicId": 1, "usedAt": -1 } }
+      ]
+    },
+    {
+      "name": "role_audit",
+      "purpose": "Auditoría de cambios de rol",
+      "fields": {
+        "targetUserId": "ObjectId",
+        "actorUserId": "ObjectId",
+        "previousRole": "string",
+        "newRole": "string",
+        "createdAt": "date"
+      },
+      "indexes": [
+        { "keys": { "createdAt": -1 } },
+        { "keys": { "targetUserId": 1, "createdAt": -1 } }
+      ]
+    },
+    {
+      "name": "membership_notifications",
+      "purpose": "Avisos internos a socios sobre vencimiento",
+      "fields": {
+        "memberId": "ObjectId",
+        "membershipExpiresAt": "date",
+        "type": "MEMBERSHIP_EXPIRING",
+        "title": "string",
+        "message": "string",
+        "daysRemaining": "integer",
+        "createdAt": "date",
+        "readAt": "date | null"
+      },
+      "indexes": [
+        { "keys": { "memberId": 1, "membershipExpiresAt": 1 }, "unique": true },
+        { "keys": { "memberId": 1, "createdAt": -1 } }
+      ]
+    },
+    {
+      "name": "medical_evaluations",
+      "purpose": "Evaluaciones médicas contabilizadas por el reporte mensual",
+      "fields": {
+        "clinicId": "string",
+        "createdAt": "date"
+      },
+      "indexes": [{ "keys": { "clinicId": 1, "createdAt": 1 } }]
+    }
+  ]
+}

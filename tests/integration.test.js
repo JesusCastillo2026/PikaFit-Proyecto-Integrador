@@ -10,6 +10,7 @@ process.env.PASS_SECRET ||= crypto.randomBytes(32).toString('hex');
 const { connect, database, close } = require('../src/db');
 const { app } = require('../src/server');
 const { createUser } = require('../src/users');
+const { queueMembershipNotices } = require('../src/membership-notices');
 
 let server;
 let base;
@@ -132,4 +133,59 @@ test('pase QR o código único, uso único e historial por clínica', async () =
   assert.equal(history.status, 200);
   assert.equal(history.data.total, 1);
   assert.equal(history.data.items[0].memberName, 'Socio QR');
+});
+
+test('avisos únicos de vencimiento y paneles e informes limitados a la clínica', async () => {
+  const admin = await signIn('admin@example.com');
+  const clinic = await request('POST', '/api/users', {
+    name: 'Administradora Clínica', email: 'admin.clinica@example.com', password: 'ClaveSegura123!',
+    role: 'ADMIN_CLINICA', clinicId: 'clinica-notificaciones',
+  }, admin);
+  assert.equal(clinic.status, 201);
+  const expiringMember = await request('POST', '/api/users', {
+    name: 'Socio por vencer', email: 'porvencer@example.com', password: 'ClaveSegura123!',
+    role: 'SOCIO', clinicId: 'clinica-notificaciones', membershipExpiresAt: '2026-10-20T00:00:00-05:00',
+  }, admin);
+  assert.equal(expiringMember.status, 201);
+  await createUser({
+    name: 'Socio de otra clínica', email: 'otra-clinica@example.com', password: 'ClaveSegura123!',
+    role: 'SOCIO', clinicId: 'otra-clinica', membershipExpiresAt: '2026-10-20T00:00:00-05:00',
+  });
+
+  const now = new Date('2026-10-15T12:00:00-05:00');
+  assert.equal(await queueMembershipNotices(now), 2);
+  assert.equal(await queueMembershipNotices(now), 0);
+  const memberToken = await signIn('porvencer@example.com');
+  const notices = await request('GET', '/api/me/notifications', undefined, memberToken);
+  assert.equal(notices.status, 200);
+  assert.equal(notices.data.items.length, 1);
+  assert.match(notices.data.items[0].message, /vence en 5 días/);
+
+  const clinicToken = await signIn('admin.clinica@example.com');
+  const expiring = await request('GET', '/api/clinic/memberships/expiring?days=10', undefined, clinicToken);
+  assert.equal(expiring.status, 200);
+  assert.deepEqual(expiring.data.items.map(item => item.name), ['Socio por vencer']);
+  assert.equal((await request('GET', '/api/clinic/memberships/expiring?days=100', undefined, clinicToken)).status, 400);
+
+  await database().collection('medical_evaluations').insertOne({ clinicId: 'clinica-notificaciones', createdAt: new Date('2026-10-10T12:00:00Z') });
+  await database().collection('medical_evaluations').insertOne({ clinicId: 'otra-clinica', createdAt: new Date('2026-10-10T12:00:00Z') });
+  await database().collection('medical_passes').insertOne({ tokenDigest: 'oct-test', codeDigest: 'oct-code', clinicId: 'clinica-notificaciones', usedAt: new Date('2026-10-11T12:00:00Z') });
+  await database().collection('medical_passes').insertOne({ tokenDigest: 'nov-test', codeDigest: 'nov-code', clinicId: 'clinica-notificaciones', usedAt: new Date('2026-11-01T12:00:00Z') });
+  const monthly = await request('GET', '/api/clinic/reports/monthly?month=2026-10', undefined, clinicToken);
+  assert.equal(monthly.status, 200);
+  assert.deepEqual(monthly.data, { month: '2026-10', evaluations: 1, validatedPasses: 1, totalActivity: 2 });
+  assert.equal((await request('GET', '/api/clinic/reports/monthly?month=2026-13', undefined, clinicToken)).status, 400);
+  const csv = await fetch(`${base}/api/clinic/reports/monthly.csv?month=2026-10`, { headers: { authorization: `Bearer ${clinicToken}` } });
+  assert.equal(csv.status, 200);
+  assert.match(await csv.text(), /"Evaluaciones médicas","Pases validados"/);
+});
+
+test('rechaza períodos mensuales vacíos o mal formados', async () => {
+  const { monthWindow } = require('../src/clinic-reports');
+  assert.throws(() => monthWindow(undefined), { code: 'invalid_month' });
+  assert.throws(() => monthWindow('2026-00'), { code: 'invalid_month' });
+  assert.throws(() => monthWindow('2026-13'), { code: 'invalid_month' });
+  assert.deepEqual(monthWindow('2026-10'), {
+    from: new Date('2026-10-01T05:00:00.000Z'), to: new Date('2026-11-01T05:00:00.000Z'),
+  });
 });

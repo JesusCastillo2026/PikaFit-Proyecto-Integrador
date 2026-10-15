@@ -1,48 +1,121 @@
-# PikaFit — avance independiente
+# PikaFit
 
-Prototipo independiente del proyecto integrador, desarrollado en un repositorio **nuevo y separado** del repositorio del equipo. Incluye los flujos de acceso, gestión de usuarios y roles, pases médicos, recepción clínica y aplicación móvil.
+PikaFit es una plataforma para administrar usuarios y roles, controlar membresías y facilitar la validación de pases médicos en clínicas afiliadas. Incluye una aplicación web, una aplicación Android y una API conectada a MongoDB.
 
-## Qué funciona
+## Funcionalidades
 
-| Historias | Avance implementado |
-| --- | --- |
-| HU001–HU002 | Acceso con correo o DNI y contraseña, contraseñas protegidas con BCrypt, autenticación mediante JWT y manejo de sesión. El DNI identifica al usuario; también se requiere contraseña. |
-| HU003–HU004 | Validación de vigencia de la membresía para generar pases y bloqueo temporal configurable después de varios intentos fallidos de acceso. |
-| HU005–HU008 | Registro de usuarios y personal médico, asignación de roles, autorización por rol, cambio de permisos e historial de auditoría. |
-| HU009–HU010 | Generación de pases temporales de un solo uso con QR y código alternativo de seis caracteres. La aplicación móvil muestra ambos y su tiempo restante. |
-| HU011–HU012 | Validación de pases en recepción mediante cámara compatible o ingreso manual, prevención de reutilización e historial paginado y filtrable para la administración de la clínica. |
+- Inicio de sesión con correo electrónico o DNI y contraseña.
+- Administración de usuarios, personal clínico, permisos por rol y auditoría de cambios.
+- Control de vigencia de membresías y bloqueo temporal configurable tras intentos fallidos de acceso.
+- Generación de pases médicos temporales de un solo uso mediante QR o código alternativo.
+- Validación de pases en recepción, consulta de historial y prevención de reutilización.
+- Avisos internos sobre membresías próximas a vencer.
+- Consulta de membresías próximas a vencer y reportes mensuales de actividad clínica con descarga CSV.
+- Aplicación Android en Kotlin y Jetpack Compose, con sesión protegida mediante Android Keystore y AES-GCM.
 
-La interfaz web es adaptable a móviles. El lector de cámara usa `BarcodeDetector` si el navegador lo admite; también está disponible el ingreso manual del código. La aplicación Android nativa está desarrollada en Kotlin con Jetpack Compose, se conecta a la API y protege localmente el token de sesión mediante Android Keystore y AES-GCM.
+## Tecnologías
 
-## Puesta en marcha
+- **Web y API:** Node.js, Express y JavaScript.
+- **Aplicación móvil:** Kotlin, Jetpack Compose y Android SDK.
+- **Base de datos:** MongoDB.
+- **Pruebas:** Node.js Test Runner y MongoDB.
 
-Requiere Node.js 20.19+ y MongoDB local o remoto. Desde esta carpeta:
+## Requisitos
+
+- Node.js 20.19 o posterior.
+- Git, para clonar el repositorio.
+- MongoDB local o accesible mediante una URI.
+- MongoDB Compass para explorar la base de datos (opcional).
+- Android Studio y Android SDK para compilar y ejecutar la aplicación móvil.
+
+## Configuración en otra computadora
+
+Instala Node.js, Git y MongoDB en la nueva computadora. Instala Android Studio si también ejecutarás la aplicación móvil; MongoDB Compass es opcional. Clona el repositorio y entra a la carpeta descargada:
 
 ```powershell
-npm install
+git clone https://github.com/JesusCastillo2026/PikaFit-Proyecto-Integrador.git
+Set-Location PikaFit-Proyecto-Integrador
+npm ci
 Copy-Item .env.example .env
 ```
 
-Edita `.env`: configura `MONGODB_URI`, dos secretos **diferentes** de al menos 32 caracteres (`JWT_SECRET` y `PASS_SECRET`) y una contraseña inicial fuerte en `ADMIN_SEED_PASSWORD`. La base indicada en `MONGODB_DB` debe ser exclusiva de esta instalación. Inicia MongoDB, luego ejecuta:
+Cada computadora debe tener su propio `.env`: configura la dirección de MongoDB, crea secretos JWT y de pases distintos y define una contraseña para el administrador inicial. No copies ni publiques un `.env` con secretos. Los documentos y cuentas de MongoDB tampoco se transfieren al clonar el código; si se requiere conservar datos, realiza y restaura una copia de seguridad autorizada por separado.
+
+## Configuración de la API
+
+Desde la carpeta del proyecto, instala dependencias y crea la configuración local:
+
+```powershell
+npm ci
+Copy-Item .env.example .env
+```
+
+Edita `.env` y configura `MONGODB_URI`, `MONGODB_DB`, dos secretos distintos de al menos 32 caracteres (`JWT_SECRET` y `PASS_SECRET`) y las credenciales para crear el administrador inicial. `MEMBERSHIP_NOTICE_DAYS` define con cuántos días de anticipación se generan los avisos internos.
+
+Inicia MongoDB y crea el administrador inicial:
 
 ```powershell
 npm run seed:admin
+```
+
+Luego inicia la API y la interfaz web:
+
+```powershell
 npm start
 ```
 
-Abre `http://localhost:3000` (o el puerto configurado). El administrador inicial crea las cuentas de socios, personal y clínica. Para crear un socio activo, añade un vencimiento de membresía futuro. La cuenta de recepción y la de administración de clínica deben compartir el mismo identificador de clínica para consultar los pases correspondientes.
+La aplicación web estará disponible en `http://localhost:3000`, salvo que se configure otro puerto en `PORT`. El administrador inicial permite registrar socios y personal. Para las funciones de clínica, las cuentas de recepción y administración deben tener el mismo `clinicId`.
 
-`npm test` ejecuta pruebas de integración con una base temporal cuyo nombre comienza por `pikafit_test_`. Para usar otra instancia en las pruebas, configura `MONGODB_URI` en el entorno antes de ejecutarlas. Las pruebas eliminan únicamente esa base temporal al terminar.
+## MongoDB Compass
 
-## Estructura
+Conecta Compass a la dirección indicada por `MONGODB_URI` (por defecto, `mongodb://127.0.0.1:27017`). La base por defecto es `pikafit_jesus`. Al conectar la API, se crean las colecciones e índices declarados en `src/db.js`.
 
-- `src/`: API Express, autenticación, usuarios, permisos, pases y conexión a MongoDB.
-- `Web/`: interfaz web para socios, administración, recepción, historial y auditoría.
-- `Android/`: aplicación móvil nativa en Kotlin con Jetpack Compose.
-- `scripts/seed-admin.js`: alta única del administrador inicial.
-- `tests/`: pruebas de los flujos principales.
-- `.env.example`: configuración necesaria, sin credenciales reales.
+La carpeta [MongoDB Compass](MongoDB%20Compass/README.md) contiene el catálogo de colecciones, campos e índices. Sus esquemas sirven como referencia y no contienen datos de usuarios para importar.
 
-## Alcance pendiente y revisión del equipo
+## Aplicación Android
 
-Este prototipo no equivale a un producto final. Falta integrarlo con los demás módulos del proyecto, desplegarlo en un entorno de pruebas, recibir revisión de otro integrante y obtener la aprobación del Product Owner. Las pruebas de integración registradas alcanzan **91,23 % de líneas** y **69,93 % de ramas** en `src/` (medición documentada mediante `node --test --experimental-test-coverage tests/integration.test.js`); falta añadir pruebas unitarias y confirmar el criterio de cobertura del equipo. El acceso por DNI requiere contraseña como medida de seguridad. No se han modificado archivos ni commits del repositorio de Millones.
+Abre la carpeta `Android` desde Android Studio, espera la sincronización de Gradle y ejecuta la configuración `app` en un emulador o dispositivo.
+
+La URL de la API para el emulador está definida como `http://10.0.2.2:3100` en `Android/app/build.gradle.kts`. Configura `PORT=3100` en `.env` para que coincida. En un teléfono físico, configura la dirección IP local del equipo donde se ejecuta la API.
+
+## Abrir y ejecutar cada programa
+
+### Visual Studio Code: web y API
+
+1. Abre Visual Studio Code y selecciona **Archivo > Abrir carpeta**.
+2. Selecciona la carpeta raíz del proyecto, donde están `package.json`, `src`, `Web` y `Android`.
+3. Abre **Terminal > Nuevo terminal**. La primera vez, ejecuta `npm ci`; crea `.env` desde `.env.example` y completa la configuración indicada arriba.
+4. Inicia MongoDB y, la primera vez, ejecuta `npm run seed:admin` para crear la cuenta inicial.
+5. En esa terminal ejecuta `npm start`. Abre `http://localhost:3000` en el navegador; si necesitas conectar también la app Android del emulador, configura `PORT=3100` y abre `http://localhost:3100`.
+
+### MongoDB Compass: base de datos
+
+1. Inicia el servicio de MongoDB y abre MongoDB Compass.
+2. En **New Connection**, escribe la URI configurada en `.env`; para MongoDB local por defecto es `mongodb://127.0.0.1:27017`.
+3. Pulsa **Connect** y busca la base `pikafit_jesus` (o el nombre configurado en `MONGODB_DB`).
+4. Inicia la API desde Visual Studio Code. Al conectarse, la aplicación crea las colecciones e índices. La carpeta `MongoDB Compass/` documenta su estructura; sus archivos de esquemas no se importan como documentos.
+
+### Android Studio: aplicación móvil
+
+1. Abre Android Studio y elige **Open**.
+2. Selecciona la carpeta `Android`, que contiene `settings.gradle.kts`.
+3. Espera a que finalice la sincronización de Gradle. Si Android Studio solicita descargar componentes del SDK, instálalos desde el IDE.
+4. En la barra superior selecciona la configuración **app** y un emulador iniciado o un dispositivo conectado.
+5. Pulsa el botón verde **Run ▶**. Mantén la API ejecutándose en Visual Studio Code y configura `PORT=3100` para que coincida con la URL del emulador (`http://10.0.2.2:3100`). Para un teléfono físico, actualiza `API_BASE_URL` en `Android/app/build.gradle.kts` con la IP local del equipo.
+
+## Pruebas
+
+```powershell
+npm test
+```
+
+Las pruebas usan una base temporal cuyo nombre comienza por `pikafit_test_` y la eliminan al finalizar. `MONGODB_URI` puede configurarse en el entorno para seleccionar la instancia de MongoDB de pruebas.
+
+## Estructura del proyecto
+
+- `src/`: API, autenticación, usuarios, pases, avisos, reportes y conexión a MongoDB.
+- `Web/`: interfaz web para socios, administración y clínicas.
+- `Android/`: aplicación móvil nativa.
+- `MongoDB Compass/`: descripción de colecciones e índices para consulta en Compass.
+- `scripts/seed-admin.js`: creación inicial del administrador.
+- `tests/`: pruebas de integración.
