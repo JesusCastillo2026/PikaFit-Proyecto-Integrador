@@ -12,12 +12,20 @@ function requiredSecret(name) {
   return value;
 }
 
+function optionalAesKey(name) {
+  const value = process.env[name] || '';
+  if (!value) return null;
+  if (!/^[a-f0-9]{64}$/i.test(value)) throw new Error(`${name} debe contener 64 caracteres hexadecimales`);
+  return Buffer.from(value, 'hex');
+}
+
 module.exports = {
   port: positiveInteger('PORT', 3000),
   mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017',
   mongoDb: process.env.MONGODB_DB || 'pikafit_jesus',
   jwtSecret: requiredSecret('JWT_SECRET'),
   passSecret: requiredSecret('PASS_SECRET'),
+  clinicalEncryptionKey: optionalAesKey('CLINICAL_ENCRYPTION_KEY'),
   lockMaxAttempts: positiveInteger('LOCK_MAX_ATTEMPTS', 5),
   lockMinutes: positiveInteger('LOCK_MINUTES', 15),
   passMinutes: positiveInteger('PASS_MINUTES', 10),
