@@ -23,6 +23,12 @@ async function connect() {
     db.collection('membership_notifications').createIndex({ memberId: 1, membershipExpiresAt: 1 }, { unique: true }),
     db.collection('membership_notifications').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('medical_evaluations').createIndex({ clinicId: 1, createdAt: 1 }),
+    db.collection('sites').createIndex({ name: 1 }, { unique: true }),
+    db.collection('machines').createIndex({ code: 1 }, { unique: true }),
+    db.collection('machines').createIndex({ serialNumber: 1 }, { unique: true }),
+    db.collection('machines').createIndex({ siteId: 1, state: 1, muscleGroup: 1 }),
+    db.collection('medical_evaluations').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('push_outbox').createIndex({ status: 1, createdAt: 1 }),
   ]);
   return db;
 }

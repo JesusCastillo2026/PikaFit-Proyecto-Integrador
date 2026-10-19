@@ -8,6 +8,7 @@ const { ROLES, createUser, publicUser, userId } = require('./users');
 const { createPass, validatePass, history } = require('./passes');
 const { notificationsForMember, startMembershipNoticeScheduler } = require('./membership-notices');
 const { expiringMemberships, monthlyClinicSummary, summaryCsv } = require('./clinic-reports');
+const training = require('./training');
 
 const app = express();
 app.disable('x-powered-by');
@@ -33,6 +34,31 @@ app.get('/api/me/notifications', authenticate, asyncRoute(async (req, res) => {
   res.json({ items: await notificationsForMember(req.user._id) });
 }));
 app.get('/api/roles', authenticate, requireRole('ADMIN'), (_req, res) => res.json({ roles: ROLES }));
+
+app.get('/api/sites', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (_req, res) => {
+  res.json({ items: await training.listSites() });
+}));
+
+app.post('/api/sites', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.status(201).json({ site: await training.createSite(req.body || {}) });
+}));
+
+app.get('/api/sites/:siteId/machines', authenticate, requireRole('ADMIN_B2B', 'ADMIN', 'SOCIO'), asyncRoute(async (req, res) => {
+  const availableOnly = req.user.role === 'SOCIO' || req.query.available === 'true';
+  res.json({ items: await training.listMachines(req.params.siteId, { availableOnly }) });
+}));
+
+app.post('/api/sites/:siteId/machines', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.status(201).json({ machine: await training.createMachine(req.params.siteId, req.body || {}) });
+}));
+
+app.get('/api/machines/:machineId/qr', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.json(await training.machineQr(req.params.machineId));
+}));
+
+app.patch('/api/machines/:machineId/status', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.json({ machine: await training.setMachineState(req.params.machineId, req.body?.state) });
+}));
 
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
   const users = await database().collection('users').find({}).sort({ createdAt: -1 }).limit(100).toArray();
