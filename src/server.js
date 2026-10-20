@@ -60,6 +60,19 @@ app.patch('/api/machines/:machineId/status', authenticate, requireRole('ADMIN_B2
   res.json({ machine: await training.setMachineState(req.params.machineId, req.body?.state) });
 }));
 
+app.post('/api/medical/evaluations', authenticate, requireRole('MEDICO'), asyncRoute(async (req, res) => {
+  res.status(201).json({ evaluation: await training.saveEvaluation(req.user, req.body || {}) });
+}));
+
+app.get('/api/medical/members/:memberId/record', authenticate, requireRole('MEDICO'), asyncRoute(async (req, res) => {
+  if (!req.user.clinicId) throw new HttpError(403, 'Tu cuenta no está asociada con una clínica', 'clinic_required');
+  res.json({ items: await training.medicalRecord(req.params.memberId, req.user.clinicId) });
+}));
+
+app.put('/api/me/push-token', authenticate, asyncRoute(async (req, res) => {
+  res.json(await training.registerPushToken(req.user._id, req.body?.token));
+}));
+
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
   const users = await database().collection('users').find({}).sort({ createdAt: -1 }).limit(100).toArray();
   res.json({ items: users.map(publicUser) });
