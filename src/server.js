@@ -73,6 +73,10 @@ app.put('/api/me/push-token', authenticate, asyncRoute(async (req, res) => {
   res.json(await training.registerPushToken(req.user._id, req.body?.token));
 }));
 
+app.get('/api/coach/members/:memberId/restrictions', authenticate, requireRole('COACH'), asyncRoute(async (req, res) => {
+  res.json(await training.coachRestrictions(req.params.memberId));
+}));
+
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
   const users = await database().collection('users').find({}).sort({ createdAt: -1 }).limit(100).toArray();
   res.json({ items: users.map(publicUser) });
