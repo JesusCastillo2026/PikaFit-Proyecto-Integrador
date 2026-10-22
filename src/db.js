@@ -29,6 +29,7 @@ async function connect() {
     db.collection('machines').createIndex({ siteId: 1, state: 1, muscleGroup: 1 }),
     db.collection('medical_evaluations').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('push_outbox').createIndex({ status: 1, createdAt: 1 }),
+    db.collection('medical_notifications').createIndex({ memberId: 1, createdAt: -1 }),
   ]);
   return db;
 }

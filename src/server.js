@@ -77,6 +77,10 @@ app.get('/api/coach/members/:memberId/restrictions', authenticate, requireRole('
   res.json(await training.coachRestrictions(req.params.memberId));
 }));
 
+app.get('/api/me/medical-notifications', authenticate, asyncRoute(async (req, res) => {
+  res.json({ items: await training.medicalNotifications(req.user._id) });
+}));
+
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
   const users = await database().collection('users').find({}).sort({ createdAt: -1 }).limit(100).toArray();
   res.json({ items: users.map(publicUser) });

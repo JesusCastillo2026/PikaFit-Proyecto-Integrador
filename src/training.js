@@ -86,11 +86,26 @@ async function saveEvaluation(actor, input) {
     $set: { medicalStatus: data.result, medicalStatusUpdatedAt: createdAt },
   });
   const token = member.pushToken;
+  const notice = {
+    memberId, kind: 'medical_status', title: 'Estado de aptitud actualizado',
+    message: data.result === 'APROBADO' ? 'Tu apto médico fue aprobado.' : 'Tu evaluación médica requiere seguimiento.',
+    result: data.result, createdAt, readAt: null,
+  };
+  await database().collection('medical_notifications').insertOne(notice);
   if (token) await database().collection('push_outbox').insertOne({
     token, memberId, kind: 'medical_status', result: data.result,
     createdAt, status: 'pending',
   });
   return { id: String(result.insertedId), memberId: String(memberId), result: data.result, restrictions: data.restrictions, createdAt, notificationQueued: Boolean(token) };
+}
+
+async function medicalNotifications(memberId) {
+  const items = await database().collection('medical_notifications')
+    .find({ memberId }).sort({ createdAt: -1 }).limit(50).toArray();
+  return items.map(item => ({
+    id: String(item._id), kind: item.kind, title: item.title,
+    message: item.message, result: item.result, createdAt: item.createdAt,
+  }));
 }
 
 async function coachRestrictions(memberId) {
@@ -125,4 +140,5 @@ async function machineQr(machineId) {
 module.exports = {
   createSite, listSites, createMachine, listMachines, setMachineState,
   saveEvaluation, coachRestrictions, medicalRecord, registerPushToken, machineQr,
+  medicalNotifications,
 };
