@@ -60,6 +60,10 @@ app.patch('/api/machines/:machineId/status', authenticate, requireRole('ADMIN_B2
   res.json({ machine: await training.setMachineState(req.params.machineId, req.body?.state) });
 }));
 
+app.get('/api/machines/:machineId/status-history', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.json(await training.machineStateHistory(req.params.machineId));
+}));
+
 app.post('/api/medical/evaluations', authenticate, requireRole('MEDICO'), asyncRoute(async (req, res) => {
   res.status(201).json({ evaluation: await training.saveEvaluation(req.user, req.body || {}) });
 }));

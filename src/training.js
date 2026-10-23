@@ -68,6 +68,18 @@ async function setMachineState(machineId, state) {
   return publicMachine(result);
 }
 
+async function machineStateHistory(machineId) {
+  const machine = await database().collection('machines').findOne(
+    { _id: objectId(machineId, 'Máquina') },
+    { projection: { code: 1, name: 1, stateHistory: 1 } },
+  );
+  if (!machine) throw new HttpError(404, 'Máquina no encontrada', 'machine_not_found');
+  return {
+    machine: { id: String(machine._id), code: machine.code, name: machine.name },
+    items: [...(machine.stateHistory || [])].reverse().slice(0, 100),
+  };
+}
+
 async function saveEvaluation(actor, input) {
   const data = normalizeEvaluation(input);
   const memberId = objectId(input.memberId, 'Socio');
@@ -139,6 +151,7 @@ async function machineQr(machineId) {
 
 module.exports = {
   createSite, listSites, createMachine, listMachines, setMachineState,
+  machineStateHistory,
   saveEvaluation, coachRestrictions, medicalRecord, registerPushToken, machineQr,
   medicalNotifications,
 };
