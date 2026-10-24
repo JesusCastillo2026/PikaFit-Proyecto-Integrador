@@ -52,6 +52,35 @@ function isExerciseAllowed(exercise, restrictions) {
   return !restrictions.some(item => riskyZones.has(item.zone) && (!item.movements.length || item.movements.some(move => riskyMovements.has(move))));
 }
 
+function normalizeExercise(input = {}) {
+  const riskZones = Array.isArray(input.riskZones) ? [...new Set(input.riskZones.map(v => text(v, 'zona de riesgo', 60).toLowerCase()))] : [];
+  const movements = Array.isArray(input.movements) ? [...new Set(input.movements.map(v => text(v, 'movimiento', 60).toLowerCase()))] : [];
+  const alternatives = Array.isArray(input.alternatives) ? [...new Set(input.alternatives.map(v => text(v, 'alternativa', 120)))] : [];
+  const series = Number(input.defaultSets ?? 3);
+  const repetitions = Number(input.defaultReps ?? 10);
+  if (!Number.isInteger(series) || series < 1 || series > 10) throw new HttpError(400, 'Las series deben estar entre 1 y 10', 'invalid_exercise_sets');
+  if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 100) throw new HttpError(400, 'Las repeticiones deben estar entre 1 y 100', 'invalid_exercise_reps');
+  return {
+    name: text(input.name, 'nombre del ejercicio', 120),
+    muscleGroup: text(input.muscleGroup, 'grupo muscular', 80),
+    movements, riskZones, machineId: input.machineId || null,
+    alternatives, bodyweightAlternative: input.bodyweightAlternative ? text(input.bodyweightAlternative, 'alternativa sin máquina', 120) : null,
+    defaultSets: series, defaultReps: repetitions,
+    restSeconds: Math.max(0, Math.min(600, Number(input.restSeconds ?? 60))),
+    active: input.active !== false,
+  };
+}
+
+function normalizeWorkoutSet(input = {}) {
+  const setNumber = Number(input.setNumber);
+  const reps = Number(input.reps);
+  const weightKg = Number(input.weightKg);
+  if (!Number.isInteger(setNumber) || setNumber < 1 || setNumber > 20) throw new HttpError(400, 'El número de serie debe estar entre 1 y 20', 'invalid_set_number');
+  if (!Number.isInteger(reps) || reps < 0 || reps > 1000) throw new HttpError(400, 'Las repeticiones deben estar entre 0 y 1000', 'invalid_reps');
+  if (!Number.isFinite(weightKg) || weightKg < 0 || weightKg > 1000) throw new HttpError(400, 'El peso debe estar entre 0 y 1000 kg', 'invalid_weight');
+  return { setNumber, reps, weightKg, completed: input.completed !== false };
+}
+
 function selectAvailableExercise(exercise, machines) {
   const available = machines.find(machine => machine._id.toString() === String(exercise.machineId) && machine.state === 'DISPONIBLE');
   if (available) return { ...exercise, machineId: String(available._id), equipment: available.name, substituted: false };
@@ -64,4 +93,5 @@ function selectAvailableExercise(exercise, machines) {
 module.exports = {
   MACHINE_STATES, EVALUATION_RESULTS, normalizeSite, normalizeMachine, validateMachine,
   normalizeEvaluation, isExerciseAllowed, selectAvailableExercise,
+  normalizeExercise, normalizeWorkoutSet,
 };

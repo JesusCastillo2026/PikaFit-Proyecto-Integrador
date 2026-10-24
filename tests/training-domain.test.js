@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, isExerciseAllowed, selectAvailableExercise } = require('../src/training-domain');
+const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, isExerciseAllowed, selectAvailableExercise, normalizeExercise, normalizeWorkoutSet } = require('../src/training-domain');
 
 test('valida sedes y normaliza identificadores de máquina', () => {
   assert.deepEqual(normalizeSite({ name: 'Sede Centro', address: 'Av. Central 100' }), { name: 'Sede Centro', address: 'Av. Central 100', active: true });
@@ -20,4 +20,11 @@ test('sustituye equipo indisponible o excluye el ejercicio sin alternativa', () 
   const machines = [{ _id: { toString: () => '2' }, state: 'DISPONIBLE', name: 'Mancuernas' }];
   assert.equal(selectAvailableExercise({ name: 'Press en máquina', machineId: '1', alternatives: ['Mancuernas'] }, machines).substituted, true);
   assert.equal(selectAvailableExercise({ name: 'Prensa', machineId: '1' }, machines), null);
+});
+
+test('normaliza catálogo de ejercicios y valida series, repeticiones y peso', () => {
+  const exercise = normalizeExercise({ name: 'Sentadilla', muscleGroup: 'Piernas', riskZones: ['Rodilla'], defaultSets: 4, defaultReps: 12 });
+  assert.equal(exercise.defaultSets, 4);
+  assert.deepEqual(normalizeWorkoutSet({ setNumber: 1, reps: 12, weightKg: 20 }), { setNumber: 1, reps: 12, weightKg: 20, completed: true });
+  assert.throws(() => normalizeWorkoutSet({ setNumber: 0, reps: -1, weightKg: 3000 }), { code: 'invalid_set_number' });
 });
