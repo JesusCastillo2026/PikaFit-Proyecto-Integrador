@@ -4,7 +4,8 @@ const QRCode = require('qrcode');
 const { database } = require('./db');
 const { HttpError, text } = require('./http');
 const { encryptClinicalText, decryptClinicalText } = require('./clinical-crypto');
-const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation } = require('./training-domain');
+const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, normalizeExercise, isExerciseAllowed, selectAvailableExercise } = require('./training-domain');
+const config = require('./config');
 
 function objectId(value, label = 'identificador') {
   if (!ObjectId.isValid(value)) throw new HttpError(400, `${label} inválido`, 'invalid_id');
@@ -149,9 +150,77 @@ async function machineQr(machineId) {
   return { qrDataUrl: await QRCode.toDataURL(`pikafit://machine/${machine.qrToken}`) };
 }
 
+async function createExercise(input) {
+  const exercise = normalizeExercise(input);
+  if (exercise.machineId) exercise.machineId = objectId(exercise.machineId, 'Máquina');
+  const document = { ...exercise, createdAt: new Date(), updatedAt: new Date() };
+  const result = await database().collection('exercises').insertOne(document);
+  return { id: String(result.insertedId), ...exercise, machineId: exercise.machineId ? String(exercise.machineId) : null };
+}
+
+async function generateRoutine(member) {
+  if (!config.routineEngineUrl) throw new HttpError(503, 'El motor de rutinas no está configurado', 'routine_engine_unavailable');
+  if (!member.siteId) throw new HttpError(400, 'Tu cuenta no tiene una sede asignada', 'site_required');
+  const evaluation = await database().collection('medical_evaluations').findOne(
+    { memberId: member._id }, { sort: { createdAt: -1 } },
+  );
+  if (!evaluation || evaluation.result !== 'APROBADO') throw new HttpError(403, 'Necesitas un apto médico aprobado para generar una rutina', 'medical_clearance_required');
+  const profile = {
+    goals: Array.isArray(member.goals) ? member.goals.slice(0, 5) : [],
+    level: member.trainingLevel || 'inicial',
+    measurements: member.measurements || {},
+    restrictions: evaluation.restrictions || [],
+    siteId: String(member.siteId),
+  };
+  let response;
+  try {
+    response = await fetch(config.routineEngineUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(config.routineEngineToken ? { authorization: `Bearer ${config.routineEngineToken}` } : {}) },
+      body: JSON.stringify({ profile }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    const timeout = error.name === 'TimeoutError';
+    throw new HttpError(504, timeout ? 'El motor de rutinas tardó demasiado; intenta nuevamente' : 'No se pudo conectar con el motor de rutinas', timeout ? 'routine_engine_timeout' : 'routine_engine_error');
+  }
+  if (!response.ok) throw new HttpError(502, 'El motor de rutinas no pudo completar la solicitud', 'routine_engine_error');
+  let generated;
+  try { generated = await response.json(); } catch { throw new HttpError(502, 'El motor devolvió una respuesta inválida', 'routine_engine_invalid_response'); }
+  if (!Array.isArray(generated.exercises) || generated.exercises.length < 1 || generated.exercises.length > 30) {
+    throw new HttpError(502, 'El motor devolvió una rutina inválida', 'routine_engine_invalid_response');
+  }
+  let requestedIds;
+  try {
+    requestedIds = [...new Set(generated.exercises.map(item => String(item.exerciseId || '')))].map(id => objectId(id, 'Ejercicio'));
+  } catch {
+    throw new HttpError(502, 'El motor devolvió identificadores de ejercicio inválidos', 'routine_engine_invalid_response');
+  }
+  const catalog = await database().collection('exercises').find({ _id: { $in: requestedIds }, active: true }).toArray();
+  const machines = await database().collection('machines').find({ siteId: objectId(member.siteId, 'Sede'), state: 'DISPONIBLE' }).toArray();
+  const normalized = [];
+  for (const item of generated.exercises) {
+    const exercise = catalog.find(candidate => String(candidate._id) === String(item.exerciseId));
+    if (!exercise || !isExerciseAllowed(exercise, evaluation.restrictions || [])) continue;
+    const selected = selectAvailableExercise({ ...exercise, machineId: exercise.machineId ? String(exercise.machineId) : null }, machines);
+    if (!selected && exercise.machineId) continue;
+    normalized.push({
+      exerciseId: String(exercise._id), name: selected?.name || exercise.name,
+      sets: exercise.defaultSets, reps: exercise.defaultReps, restSeconds: exercise.restSeconds,
+      equipment: selected?.equipment || null, substituted: selected?.substituted || false,
+    });
+  }
+  if (!normalized.length) throw new HttpError(422, 'No hay ejercicios seguros disponibles para tu sede y restricciones', 'no_safe_exercises');
+  const now = new Date();
+  const routine = { memberId: member._id, siteId: objectId(member.siteId), exercises: normalized, createdAt: now, source: 'configured-engine' };
+  const saved = await database().collection('routines').insertOne(routine);
+  return { id: String(saved.insertedId), exercises: normalized, createdAt: now };
+}
+
 module.exports = {
   createSite, listSites, createMachine, listMachines, setMachineState,
   machineStateHistory,
   saveEvaluation, coachRestrictions, medicalRecord, registerPushToken, machineQr,
   medicalNotifications,
+  createExercise, generateRoutine,
 };

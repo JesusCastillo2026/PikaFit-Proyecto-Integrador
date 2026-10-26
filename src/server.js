@@ -85,6 +85,14 @@ app.get('/api/me/medical-notifications', authenticate, asyncRoute(async (req, re
   res.json({ items: await training.medicalNotifications(req.user._id) });
 }));
 
+app.post('/api/exercises', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.status(201).json({ exercise: await training.createExercise(req.body || {}) });
+}));
+
+app.post('/api/me/routines/generate', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.status(201).json({ routine: await training.generateRoutine(req.user) });
+}));
+
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
   const users = await database().collection('users').find({}).sort({ createdAt: -1 }).limit(100).toArray();
   res.json({ items: users.map(publicUser) });

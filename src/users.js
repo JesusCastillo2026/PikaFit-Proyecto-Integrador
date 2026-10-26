@@ -25,6 +25,8 @@ function publicUser(user) {
   return {
     id: String(user._id), name: user.name, email: user.email, dni: user.dni,
     role: user.role, clinicId: user.clinicId || null,
+    siteId: user.siteId ? String(user.siteId) : null,
+    medicalStatus: user.role === 'SOCIO' ? (user.medicalStatus || 'PENDIENTE') : null,
     membershipExpiresAt: user.membershipExpiresAt || null,
     membershipActive: user.role === 'SOCIO' ? Boolean(user.membershipExpiresAt && new Date(user.membershipExpiresAt) > new Date()) : null,
   };
@@ -39,6 +41,9 @@ async function createUser(input) {
   const role = input.role || 'SOCIO';
   if (!ROLES.includes(role)) throw new HttpError(400, 'Rol inválido', 'invalid_role');
   const clinicId = input.clinicId ? text(input.clinicId, 'clínica', 80) : null;
+  const rawSiteId = input.siteId ? text(input.siteId, 'sede', 80) : null;
+  if (rawSiteId && !ObjectId.isValid(rawSiteId)) throw new HttpError(400, 'Sede inválida', 'invalid_id');
+  const siteId = rawSiteId ? new ObjectId(rawSiteId) : null;
   if (['RECEPCION_CLINICA', 'ADMIN_CLINICA'].includes(role) && !clinicId) {
     throw new HttpError(400, 'El personal de clínica debe tener una clínica asociada', 'clinic_required');
   }
@@ -46,7 +51,7 @@ async function createUser(input) {
   const document = {
     name, email, ...(dni ? { dni } : {}), role,
     passwordHash: await bcrypt.hash(password, 12),
-    membershipExpiresAt, clinicId,
+    membershipExpiresAt, clinicId, siteId,
     failedAttempts: 0, lockedUntil: null, tokenVersion: 0,
     createdAt: new Date(), updatedAt: new Date(),
   };

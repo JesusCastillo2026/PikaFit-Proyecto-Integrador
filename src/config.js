@@ -26,6 +26,8 @@ module.exports = {
   jwtSecret: requiredSecret('JWT_SECRET'),
   passSecret: requiredSecret('PASS_SECRET'),
   clinicalEncryptionKey: optionalAesKey('CLINICAL_ENCRYPTION_KEY'),
+  routineEngineUrl: process.env.ROUTINE_ENGINE_URL || '',
+  routineEngineToken: process.env.ROUTINE_ENGINE_TOKEN || '',
   lockMaxAttempts: positiveInteger('LOCK_MAX_ATTEMPTS', 5),
   lockMinutes: positiveInteger('LOCK_MINUTES', 15),
   passMinutes: positiveInteger('PASS_MINUTES', 10),
