@@ -4,7 +4,7 @@ const QRCode = require('qrcode');
 const { database } = require('./db');
 const { HttpError, text } = require('./http');
 const { encryptClinicalText, decryptClinicalText } = require('./clinical-crypto');
-const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, normalizeExercise, isExerciseAllowed, selectAvailableExercise } = require('./training-domain');
+const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, normalizeExercise, buildSafeRoutine } = require('./training-domain');
 const config = require('./config');
 
 function objectId(value, label = 'identificador') {
@@ -198,18 +198,8 @@ async function generateRoutine(member) {
   }
   const catalog = await database().collection('exercises').find({ _id: { $in: requestedIds }, active: true }).toArray();
   const machines = await database().collection('machines').find({ siteId: objectId(member.siteId, 'Sede'), state: 'DISPONIBLE' }).toArray();
-  const normalized = [];
-  for (const item of generated.exercises) {
-    const exercise = catalog.find(candidate => String(candidate._id) === String(item.exerciseId));
-    if (!exercise || !isExerciseAllowed(exercise, evaluation.restrictions || [])) continue;
-    const selected = selectAvailableExercise({ ...exercise, machineId: exercise.machineId ? String(exercise.machineId) : null }, machines);
-    if (!selected && exercise.machineId) continue;
-    normalized.push({
-      exerciseId: String(exercise._id), name: selected?.name || exercise.name,
-      sets: exercise.defaultSets, reps: exercise.defaultReps, restSeconds: exercise.restSeconds,
-      equipment: selected?.equipment || null, substituted: selected?.substituted || false,
-    });
-  }
+  const orderedCandidates = generated.exercises.map(item => catalog.find(candidate => String(candidate._id) === String(item.exerciseId))).filter(Boolean);
+  const normalized = buildSafeRoutine(orderedCandidates, evaluation.restrictions || [], machines);
   if (!normalized.length) throw new HttpError(422, 'No hay ejercicios seguros disponibles para tu sede y restricciones', 'no_safe_exercises');
   const now = new Date();
   const routine = { memberId: member._id, siteId: objectId(member.siteId), exercises: normalized, createdAt: now, source: 'configured-engine' };

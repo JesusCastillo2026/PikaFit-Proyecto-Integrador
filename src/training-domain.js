@@ -58,15 +58,17 @@ function normalizeExercise(input = {}) {
   const alternatives = Array.isArray(input.alternatives) ? [...new Set(input.alternatives.map(v => text(v, 'alternativa', 120)))] : [];
   const series = Number(input.defaultSets ?? 3);
   const repetitions = Number(input.defaultReps ?? 10);
+  const restSeconds = Number(input.restSeconds ?? 60);
   if (!Number.isInteger(series) || series < 1 || series > 10) throw new HttpError(400, 'Las series deben estar entre 1 y 10', 'invalid_exercise_sets');
   if (!Number.isInteger(repetitions) || repetitions < 1 || repetitions > 100) throw new HttpError(400, 'Las repeticiones deben estar entre 1 y 100', 'invalid_exercise_reps');
+  if (!Number.isInteger(restSeconds) || restSeconds < 0 || restSeconds > 600) throw new HttpError(400, 'El descanso debe estar entre 0 y 600 segundos', 'invalid_rest_seconds');
   return {
     name: text(input.name, 'nombre del ejercicio', 120),
     muscleGroup: text(input.muscleGroup, 'grupo muscular', 80),
     movements, riskZones, machineId: input.machineId || null,
     alternatives, bodyweightAlternative: input.bodyweightAlternative ? text(input.bodyweightAlternative, 'alternativa sin máquina', 120) : null,
     defaultSets: series, defaultReps: repetitions,
-    restSeconds: Math.max(0, Math.min(600, Number(input.restSeconds ?? 60))),
+    restSeconds,
     active: input.active !== false,
   };
 }
@@ -90,8 +92,24 @@ function selectAvailableExercise(exercise, machines) {
   return null;
 }
 
+function buildSafeRoutine(candidates, restrictions, machines) {
+  const result = [];
+  for (const exercise of candidates) {
+    if (!isExerciseAllowed(exercise, restrictions)) continue;
+    const selected = selectAvailableExercise({ ...exercise, machineId: exercise.machineId ? String(exercise.machineId) : null }, machines);
+    if (exercise.machineId && !selected) continue;
+    result.push({
+      exerciseId: String(exercise._id), name: selected?.name || exercise.name,
+      sets: exercise.defaultSets, reps: exercise.defaultReps, restSeconds: exercise.restSeconds,
+      equipment: selected?.equipment || null, substituted: selected?.substituted || false,
+    });
+  }
+  return result;
+}
+
 module.exports = {
   MACHINE_STATES, EVALUATION_RESULTS, normalizeSite, normalizeMachine, validateMachine,
   normalizeEvaluation, isExerciseAllowed, selectAvailableExercise,
   normalizeExercise, normalizeWorkoutSet,
+  buildSafeRoutine,
 };

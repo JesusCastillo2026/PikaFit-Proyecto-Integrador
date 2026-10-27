@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, isExerciseAllowed, selectAvailableExercise, normalizeExercise, normalizeWorkoutSet } = require('../src/training-domain');
+const { normalizeSite, normalizeMachine, validateMachine, normalizeEvaluation, isExerciseAllowed, selectAvailableExercise, normalizeExercise, normalizeWorkoutSet, buildSafeRoutine } = require('../src/training-domain');
 
 test('valida sedes y normaliza identificadores de máquina', () => {
   assert.deepEqual(normalizeSite({ name: 'Sede Centro', address: 'Av. Central 100' }), { name: 'Sede Centro', address: 'Av. Central 100', active: true });
@@ -27,4 +27,15 @@ test('normaliza catálogo de ejercicios y valida series, repeticiones y peso', (
   assert.equal(exercise.defaultSets, 4);
   assert.deepEqual(normalizeWorkoutSet({ setNumber: 1, reps: 12, weightKg: 20 }), { setNumber: 1, reps: 12, weightKg: 20, completed: true });
   assert.throws(() => normalizeWorkoutSet({ setNumber: 0, reps: -1, weightKg: 3000 }), { code: 'invalid_set_number' });
+});
+
+test('la rutina final excluye riesgos y máquinas fuera de servicio', () => {
+  const machines = [{ _id: { toString: () => 'available' }, name: 'Mancuernas', state: 'DISPONIBLE' }];
+  const candidates = [
+    { _id: 'a', name: 'Press', machineId: 'missing', alternatives: ['Mancuernas'], riskZones: [], movements: [], defaultSets: 3, defaultReps: 10, restSeconds: 60 },
+    { _id: 'b', name: 'Elevación', machineId: null, riskZones: ['hombro'], movements: ['press'], defaultSets: 3, defaultReps: 10, restSeconds: 60 },
+    { _id: 'c', name: 'Sentadilla', machineId: 'offline', riskZones: [], movements: [], defaultSets: 3, defaultReps: 10, restSeconds: 60 },
+  ];
+  const result = buildSafeRoutine(candidates, [{ zone: 'hombro', movements: ['press'] }], machines);
+  assert.deepEqual(result.map(item => [item.name, item.substituted]), [['Press', true]]);
 });
