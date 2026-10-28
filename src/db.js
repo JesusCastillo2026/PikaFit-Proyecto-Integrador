@@ -32,6 +32,8 @@ async function connect() {
     db.collection('medical_notifications').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('exercises').createIndex({ name: 1 }, { unique: true }),
     db.collection('routines').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('workout_sessions').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('workout_sessions').createIndex({ memberId: 1, endedAt: 1 }),
   ]);
   return db;
 }

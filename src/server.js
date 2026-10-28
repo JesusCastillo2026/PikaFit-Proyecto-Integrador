@@ -9,6 +9,7 @@ const { createPass, validatePass, history } = require('./passes');
 const { notificationsForMember, startMembershipNoticeScheduler } = require('./membership-notices');
 const { expiringMemberships, monthlyClinicSummary, summaryCsv } = require('./clinic-reports');
 const training = require('./training');
+const workouts = require('./workouts');
 
 const app = express();
 app.disable('x-powered-by');
@@ -91,6 +92,22 @@ app.post('/api/exercises', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyn
 
 app.post('/api/me/routines/generate', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
   res.status(201).json({ routine: await training.generateRoutine(req.user) });
+}));
+
+app.post('/api/me/training/sessions', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.status(201).json({ session: await workouts.startSession(req.user._id, req.body?.routineId) });
+}));
+
+app.post('/api/me/training/sessions/:sessionId/sets', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.status(201).json({ set: await workouts.recordSet(req.user._id, req.params.sessionId, req.body || {}) });
+}));
+
+app.post('/api/me/training/sessions/:sessionId/finish', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.json({ session: await workouts.finishSession(req.user._id, req.params.sessionId) });
+}));
+
+app.get('/api/me/training/sessions', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.json({ items: await workouts.sessionHistory(req.user._id) });
 }));
 
 app.get('/api/users', authenticate, requireRole('ADMIN'), asyncRoute(async (_req, res) => {
