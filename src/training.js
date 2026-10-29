@@ -138,6 +138,15 @@ async function medicalRecord(memberId, clinicId) {
   }));
 }
 
+async function medicalRecordPdf(memberId, clinicId) {
+  const id = objectId(memberId, 'Socio');
+  const member = await database().collection('users').findOne({ _id: id, role: 'SOCIO', clinicId }, { projection: { name: 1 } });
+  if (!member) throw new HttpError(404, 'Socio no encontrado', 'member_not_found');
+  const evaluations = await medicalRecord(memberId, clinicId);
+  const { generateMedicalPdf } = require('./medical-pdf');
+  return generateMedicalPdf({ memberName: member.name, evaluations });
+}
+
 async function registerPushToken(userId, value) {
   const token = text(value, 'token push', 4096);
   await database().collection('users').updateOne({ _id: userId }, { $set: { pushToken: token, pushTokenUpdatedAt: new Date() } });
@@ -210,7 +219,7 @@ async function generateRoutine(member) {
 module.exports = {
   createSite, listSites, createMachine, listMachines, setMachineState,
   machineStateHistory,
-  saveEvaluation, coachRestrictions, medicalRecord, registerPushToken, machineQr,
+  saveEvaluation, coachRestrictions, medicalRecord, medicalRecordPdf, registerPushToken, machineQr,
   medicalNotifications,
   createExercise, generateRoutine,
 };

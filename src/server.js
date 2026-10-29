@@ -74,6 +74,13 @@ app.get('/api/medical/members/:memberId/record', authenticate, requireRole('MEDI
   res.json({ items: await training.medicalRecord(req.params.memberId, req.user.clinicId) });
 }));
 
+app.get('/api/medical/members/:memberId/record.pdf', authenticate, requireRole('MEDICO'), asyncRoute(async (req, res) => {
+  if (!req.user.clinicId) throw new HttpError(403, 'Tu cuenta no está asociada con una clínica', 'clinic_required');
+  const pdf = await training.medicalRecordPdf(req.params.memberId, req.user.clinicId);
+  res.set({ 'Cache-Control': 'private, no-store', 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="pikafit-ficha-medica.pdf"' });
+  res.send(pdf);
+}));
+
 app.put('/api/me/push-token', authenticate, asyncRoute(async (req, res) => {
   res.json(await training.registerPushToken(req.user._id, req.body?.token));
 }));
