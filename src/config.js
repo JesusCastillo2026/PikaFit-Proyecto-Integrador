@@ -32,5 +32,7 @@ module.exports = {
   lockMinutes: positiveInteger('LOCK_MINUTES', 15),
   passMinutes: positiveInteger('PASS_MINUTES', 10),
   membershipNoticeDays: positiveInteger('MEMBERSHIP_NOTICE_DAYS', 7),
+  fatigueHighReductionPercent: positiveInteger('FATIGUE_HIGH_REDUCTION_PERCENT', 20),
+  maxExerciseVideoBytes: positiveInteger('MAX_EXERCISE_VIDEO_BYTES', 25 * 1024 * 1024),
 };
 

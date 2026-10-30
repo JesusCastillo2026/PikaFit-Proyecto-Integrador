@@ -15,7 +15,7 @@ async function startSession(memberId, routineId) {
   const active = await database().collection('workout_sessions').findOne({ memberId: member, endedAt: null });
   if (active) throw new HttpError(409, 'Ya tienes una sesión en curso', 'session_already_active');
   const createdAt = new Date();
-  const session = { memberId: member, routineId: routine._id, exercises: routine.exercises, sets: [], createdAt, endedAt: null };
+  const session = { memberId: member, routineId: routine._id, siteId: routine.siteId || null, exercises: routine.exercises, sets: [], createdAt, endedAt: null };
   const result = await database().collection('workout_sessions').insertOne(session);
   return { id: String(result.insertedId), createdAt, exercises: routine.exercises, sets: [] };
 }
@@ -24,6 +24,7 @@ async function recordSet(memberId, sessionId, input) {
   const member = asId(memberId, 'Socio');
   const id = asId(sessionId, 'Sesión');
   const set = normalizeWorkoutSet(input);
+  if (input.rpe != null) set.rpe = require('./sprint3').normalizeRpe(input.rpe);
   const exerciseId = String(input.exerciseId || '');
   if (!exerciseId) throw new HttpError(400, 'Debes seleccionar un ejercicio de la rutina', 'exercise_required');
   const sessions = database().collection('workout_sessions');
@@ -37,13 +38,19 @@ async function recordSet(memberId, sessionId, input) {
   return entry;
 }
 
-async function finishSession(memberId, sessionId) {
+async function finishSession(memberId, sessionId, rpe) {
+  if (rpe != null) require('./sprint3').normalizeRpe(rpe);
   const result = await database().collection('workout_sessions').findOneAndUpdate(
     { _id: asId(sessionId, 'Sesión'), memberId: asId(memberId, 'Socio'), endedAt: null },
-    { $set: { endedAt: new Date() } }, { returnDocument: 'after' },
+    { $set: { endedAt: new Date(), ...(rpe == null ? {} : { rpe: Number(rpe) }) } }, { returnDocument: 'after' },
   );
   if (!result) throw new HttpError(404, 'Sesión activa no encontrada', 'session_not_found');
   return { id: String(result._id), createdAt: result.createdAt, endedAt: result.endedAt, sets: result.sets };
+}
+
+async function activeSession(memberId) {
+  const session = await database().collection('workout_sessions').findOne({ memberId: asId(memberId, 'Socio'), endedAt: null });
+  return session ? { id: String(session._id), routineId: String(session.routineId), exercises: session.exercises, createdAt: session.createdAt, sets: session.sets } : null;
 }
 
 async function sessionHistory(memberId) {
@@ -52,4 +59,4 @@ async function sessionHistory(memberId) {
   return items.map(item => ({ id: String(item._id), routineId: String(item.routineId), createdAt: item.createdAt, endedAt: item.endedAt, setCount: item.sets.length }));
 }
 
-module.exports = { startSession, recordSet, finishSession, sessionHistory };
+module.exports = { startSession, recordSet, finishSession, sessionHistory, activeSession };

@@ -34,6 +34,11 @@ async function connect() {
     db.collection('routines').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('workout_sessions').createIndex({ memberId: 1, createdAt: -1 }),
     db.collection('workout_sessions').createIndex({ memberId: 1, endedAt: 1 }),
+    db.collection('fatigue_reports').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('discomfort_reports').createIndex({ memberId: 1, createdAt: -1 }),
+    db.collection('exercise_media').createIndex({ exerciseId: 1, active: 1, createdAt: -1 }),
+    db.collection('coach_members').createIndex({ coachId: 1, memberId: 1 }, { unique: true }),
+    db.collection('nutrition_guides').createIndex({ goal: 1 }, { unique: true }),
   ]);
   return db;
 }
