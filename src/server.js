@@ -10,6 +10,7 @@ const { notificationsForMember, startMembershipNoticeScheduler } = require('./me
 const { expiringMemberships, monthlyClinicSummary, summaryCsv } = require('./clinic-reports');
 const training = require('./training');
 const workouts = require('./workouts');
+const sprint3 = require('./sprint3');
 
 const app = express();
 app.disable('x-powered-by');
@@ -97,6 +98,27 @@ app.post('/api/exercises', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyn
   res.status(201).json({ exercise: await training.createExercise(req.body || {}) });
 }));
 
+app.get('/api/exercises/:exerciseId/media', authenticate, requireRole('SOCIO', 'COACH', 'ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.json({ items: await sprint3.listExerciseMedia(req.params.exerciseId) });
+}));
+
+app.post('/api/exercises/:exerciseId/media', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.status(201).json({ media: await sprint3.createExerciseMedia(req.user, req.params.exerciseId, req.body || {}, config.maxExerciseVideoBytes) });
+}));
+
+app.put('/api/exercise-media/:mediaId/content', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), express.raw({ type: ['video/mp4', 'video/webm'], limit: config.maxExerciseVideoBytes }), asyncRoute(async (req, res) => {
+  res.json({ media: await sprint3.saveExerciseMedia(req.params.mediaId, req.body, config.maxExerciseVideoBytes) });
+}));
+
+app.get('/api/exercise-media/:mediaId/content', authenticate, requireRole('SOCIO', 'COACH', 'ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  const { media, buffer } = await sprint3.getExerciseMedia(req.params.mediaId);
+  res.set({ 'Content-Type': media.contentType, 'Content-Length': String(buffer.length), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }).send(buffer);
+}));
+
+app.patch('/api/exercise-media/:mediaId', authenticate, requireRole('ADMIN_B2B', 'ADMIN'), asyncRoute(async (req, res) => {
+  res.json({ media: await sprint3.setExerciseMediaActive(req.params.mediaId, req.body?.active) });
+}));
+
 app.post('/api/me/routines/generate', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
   res.status(201).json({ routine: await training.generateRoutine(req.user) });
 }));
@@ -110,7 +132,31 @@ app.post('/api/me/training/sessions/:sessionId/sets', authenticate, requireRole(
 }));
 
 app.post('/api/me/training/sessions/:sessionId/finish', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
-  res.json({ session: await workouts.finishSession(req.user._id, req.params.sessionId) });
+  res.json({ session: await workouts.finishSession(req.user._id, req.params.sessionId, req.body?.rpe) });
+}));
+
+app.get('/api/me/training/sessions/active', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.json({ session: await workouts.activeSession(req.user._id) });
+}));
+
+app.post('/api/me/fatigue-reports', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.status(201).json({ adaptation: await sprint3.reportFatigue(req.user._id, req.body?.routineId, req.body?.level, config.fatigueHighReductionPercent) });
+}));
+
+app.post('/api/me/training/sessions/:sessionId/discomfort', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.status(201).json(await sprint3.reportDiscomfort(req.user._id, req.params.sessionId, req.body || {}));
+}));
+
+app.get('/api/me/nutrition-guides', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
+  res.json({ items: await sprint3.listNutritionGuides(req.query.goal) });
+}));
+
+app.post('/api/coach/members/:memberId/assign', authenticate, requireRole('ADMIN', 'ADMIN_B2B'), asyncRoute(async (req, res) => {
+  res.json(await sprint3.assignCoachMember(req.body?.coachId, req.params.memberId));
+}));
+
+app.get('/api/coach/dashboard', authenticate, requireRole('COACH'), asyncRoute(async (req, res) => {
+  res.json(await sprint3.coachDashboard(req.user._id));
 }));
 
 app.get('/api/me/training/sessions', authenticate, requireRole('SOCIO'), asyncRoute(async (req, res) => {
@@ -229,6 +275,7 @@ app.use((err, _req, res, _next) => {
 
 if (require.main === module) {
   connect().then(() => {
+    sprint3.ensureNutritionGuides().catch(error => console.error('No se pudieron inicializar las guías nutricionales:', error));
     const reminderTimer = startMembershipNoticeScheduler();
     const server = app.listen(config.port, () => console.log(`PikaFit disponible en http://localhost:${config.port}`));
     const shutdown = async () => { clearInterval(reminderTimer); server.close(); await close(); };
