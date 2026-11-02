@@ -57,6 +57,12 @@
 
       <section id="audit-panel" class="card panel" hidden><h2>Auditoría de roles</h2><div id="audit-list" class="list"></div></section>
 
+      <section id="coach-panel" class="card panel" hidden><div class="section-heading"><div><h2>Seguimiento de socios</h2><p class="muted">Esfuerzo percibido de las últimas sesiones.</p></div><button id="load-coach-dashboard" class="button secondary" type="button">Actualizar</button></div><div id="coach-list" class="list"></div></section>
+
+      <section id="media-panel" class="card panel" hidden><h2>Videos de ejercicios</h2><p class="muted">Publica material MP4 o WebM asociado a un ejercicio activo.</p><form id="media-form" class="filters"><label>ID del ejercicio<input name="exerciseId" required></label><label>Título<input name="title" required maxlength="120"></label><label>Archivo<input name="file" type="file" accept="video/mp4,video/webm" required></label><button class="button primary" type="submit">Subir y publicar</button></form><p id="media-message" class="message" role="status"></p><div id="media-list" class="list"></div></section>
+
+      <section id="nutrition-panel" class="card panel" hidden><h2>Guías de alimentación</h2><div id="nutrition-list" class="list"></div></section>
+
       <section id="reception-panel" class="panel-grid" hidden>
         <form id="validate-form" class="card panel"><h2>Validar pase</h2><p class="muted">Ingresa el código de seis caracteres o el valor leído del QR.</p><label>Código o QR<input name="value" required autocomplete="off"></label><button class="button primary" type="submit">Validar</button><p id="validation-message" class="message" role="status"></p></form>
         <div class="card panel"><h2>Escanear QR</h2><p class="muted">Activa la cámara para leer el pase del socio.</p><button id="start-camera" class="button secondary" type="button">Abrir cámara</button><button id="stop-camera" class="button ghost" type="button" hidden>Cerrar cámara</button><video id="camera" autoplay playsinline hidden></video><p id="camera-message" class="message" role="status"></p></div>

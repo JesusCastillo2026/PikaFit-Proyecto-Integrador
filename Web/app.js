@@ -48,6 +48,9 @@ function renderUser(user) {
   $('audit-panel').hidden = !['ADMIN', 'AUDITOR'].includes(user.role);
   $('reception-panel').hidden = user.role !== 'RECEPCION_CLINICA';
   $('clinic-admin-panel').hidden = user.role !== 'ADMIN_CLINICA';
+  $('coach-panel').hidden = user.role !== 'COACH';
+  $('media-panel').hidden = !['ADMIN', 'ADMIN_B2B'].includes(user.role);
+  $('nutrition-panel').hidden = user.role !== 'SOCIO';
   if (user.role === 'SOCIO') {
     const active = user.membershipActive;
     $('membership-message').textContent = active
@@ -70,6 +73,8 @@ async function refreshDashboard() {
       await loadMonthlyReport();
     }
     if (user.role === 'SOCIO') await loadMemberNotifications();
+    if (user.role === 'COACH') await loadCoachDashboard();
+    if (user.role === 'SOCIO') await loadNutritionGuides();
   } catch {
     token = null;
     sessionStorage.removeItem('pikafit_token');
@@ -250,6 +255,41 @@ async function loadMemberNotifications() {
     container.append(row);
   }
 }
+
+async function loadNutritionGuides() {
+  const { items } = await api('/api/me/nutrition-guides');
+  const container = $('nutrition-list'); container.replaceChildren();
+  for (const guide of items) {
+    const row = element('div', 'list-item'); const info = element('div');
+    info.append(element('strong', '', guide.title), element('small', '', guide.sections.join(' ')));
+    row.append(info); container.append(row);
+  }
+}
+
+async function loadCoachDashboard() {
+  const { items } = await api('/api/coach/dashboard'); const container = $('coach-list'); container.replaceChildren();
+  if (!items.length) return container.append(element('p', 'muted', 'No hay socios asignados a tu cuenta.'));
+  for (const member of items) {
+    const row = element('div', 'list-item'); const info = element('div');
+    info.append(element('strong', '', member.memberName), element('small', '', `RPE promedio reciente: ${member.averageRpe ?? 'sin datos'} · ${member.sessions.length} sesiones`));
+    if (member.alert) info.append(element('small', 'error', 'Esfuerzo alto en tres sesiones consecutivas; revisar con el socio.'));
+    const chart = element('div', 'list');
+    member.sessions.forEach(session => { const line = element('div', 'list-item'); line.textContent = `${new Date(session.endedAt).toLocaleDateString('es-PE')} · RPE ${session.rpe}`; chart.append(line); });
+    row.append(info, chart); container.append(row);
+  }
+}
+$('load-coach-dashboard').addEventListener('click', () => loadCoachDashboard().catch(error => message('dashboard-message', error.message, true)));
+
+$('media-form').addEventListener('submit', async event => {
+  event.preventDefault(); const form = event.currentTarget; const fields = new FormData(form); const file = fields.get('file');
+  if (!(file instanceof File) || !file.size) return message('media-message', 'Selecciona un video válido.', true);
+  try {
+    const { media } = await api(`/api/exercises/${encodeURIComponent(fields.get('exerciseId'))}/media`, { method: 'POST', body: JSON.stringify({ title: fields.get('title'), contentType: file.type, sizeBytes: file.size }) });
+    const response = await fetch(`/api/exercise-media/${media.id}/content`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type }, body: file });
+    const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || 'No se pudo guardar el video');
+    message('media-message', 'Video publicado y disponible para la app.'); form.reset();
+  } catch (error) { message('media-message', error.message, true); }
+});
 
 async function loadExpiringMemberships() {
   const days = $('expiry-days').value || '30';
