@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -80,6 +84,10 @@ private fun PikaFitApp(
     var pass by remember { mutableStateOf<PassResult?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var routine by remember { mutableStateOf<RoutineResult?>(null) }
+    var activeSession by remember { mutableStateOf<TrainingSession?>(null) }
+    var guides by remember { mutableStateOf<List<Guide>>(emptyList()) }
+    var coachData by remember { mutableStateOf<List<CoachMember>>(emptyList()) }
 
     fun launchRequest(action: suspend () -> Unit) {
         scope.launch {
@@ -100,6 +108,10 @@ private fun PikaFitApp(
                 }
             }
         }
+    }
+    androidx.compose.runtime.LaunchedEffect(token, user?.role) {
+        if (token != null && user?.role == "SOCIO") runCatching { activeSession = api.activeSession(token!!) }
+        if (token != null && user?.role == "COACH") runCatching { coachData = api.coachDashboard(token!!) }
     }
 
     Column(
@@ -134,6 +146,16 @@ private fun PikaFitApp(
                 busy = busy,
                 error = error,
                 onCreatePass = { launchRequest { pass = api.createPass(token!!) } },
+                routine = routine,
+                activeSession = activeSession,
+                guides = guides,
+                onGenerateRoutine = { launchRequest { routine = api.generateRoutine(token!!); activeSession = null } },
+                onReportFatigue = { level -> launchRequest { val r = routine ?: api.generateRoutine(token!!).also { routine = it }; api.reportFatigue(token!!, r.id, level); routine = api.generateRoutine(token!!) } },
+                onStartSession = { launchRequest { val r = routine ?: api.generateRoutine(token!!).also { routine = it }; activeSession = api.startSession(token!!, r.id) } },
+                onReportDiscomfort = { exercise, zone -> launchRequest { activeSession?.let { api.reportDiscomfort(token!!, it.id, exercise, zone); activeSession = api.activeSession(token!!) } } },
+                onFinishSession = { rpe -> launchRequest { activeSession?.let { api.finishSession(token!!, it.id, rpe); activeSession = null } } },
+                onLoadGuides = { launchRequest { guides = api.guides(token!!) } },
+                coachData = coachData,
                 onLogout = {
                     user = null; token = null; pass = null; password = ""; onClearToken()
                 },
@@ -181,6 +203,10 @@ private fun MemberCard(
     busy: Boolean,
     error: String?,
     onCreatePass: () -> Unit,
+    routine: RoutineResult?, activeSession: TrainingSession?, guides: List<Guide>,
+    onGenerateRoutine: () -> Unit, onReportFatigue: (String) -> Unit, onStartSession: () -> Unit,
+    onReportDiscomfort: (String, String) -> Unit, onFinishSession: (Int) -> Unit, onLoadGuides: () -> Unit,
+    coachData: List<CoachMember>,
     onLogout: () -> Unit,
 ) {
     val isActiveMember = user.role == "SOCIO" && user.membershipActive == true
@@ -195,7 +221,7 @@ private fun MemberCard(
         }
     }
     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.padding(22.dp).heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Hola, ${user.name}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(user.email, style = MaterialTheme.typography.bodySmall)
             if (isActiveMember) {
@@ -218,6 +244,34 @@ private fun MemberCard(
                 Text("Tu membresía está vencida. Debes renovarla para generar un pase.", color = MaterialTheme.colorScheme.error)
             } else {
                 Text("Esta función de pases está disponible para cuentas de socio.")
+            }
+            if (user.role == "SOCIO") {
+                androidx.compose.material3.HorizontalDivider()
+                Text("Entrenamiento", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Button(onClick = onGenerateRoutine, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Generar rutina") }
+                routine?.let { r ->
+                    r.exercises.forEach { Text("${it.name} · ${it.sets} series × ${it.reps} repeticiones") }
+                    Text("¿Cómo te sientes antes de entrenar?")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("BAJA", "MEDIA", "ALTA").forEach { level -> Button(onClick = { onReportFatigue(level) }, enabled = !busy) { Text(level.lowercase().replaceFirstChar(Char::uppercase)) } }
+                    }
+                    if (activeSession == null) Button(onClick = onStartSession, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Iniciar sesión") }
+                }
+                activeSession?.let { session ->
+                    Text("Sesión activa. Reporta dolor indicando ejercicio y zona para pedir sustitución segura.")
+                    session.exercises.forEach { exercise ->
+                        Text("${exercise.name} · ${exercise.sets} × ${exercise.reps}")
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("rodilla", "espalda", "hombro").forEach { zone -> TextButton(onClick = { onReportDiscomfort(exercise.exerciseId, zone) }) { Text("Molestia: $zone") } } }
+                    }
+                    Text("Esfuerzo percibido al terminar (RPE 1–10)")
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { (1..10).forEach { score -> TextButton(onClick = { onFinishSession(score) }, enabled = !busy) { Text(score.toString()) } } }
+                }
+                Button(onClick = onLoadGuides, modifier = Modifier.fillMaxWidth()) { Text("Ver guías de nutrición") }
+                guides.forEach { guide -> Text("${guide.title}: ${guide.sections.joinToString(" ")}", style = MaterialTheme.typography.bodySmall) }
+            }
+            if (user.role == "COACH") {
+                Text("Panel de socios", style = MaterialTheme.typography.titleMedium)
+                coachData.forEach { member -> Text("${member.memberName} · RPE promedio ${member.averageRpe ?: "—"}${if (member.alert) " · Atención: esfuerzo alto repetido" else ""}") }
             }
             if (error != null) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onLogout) { Text("Cerrar sesión") }

@@ -18,6 +18,11 @@ data class User(
 
 data class LoginResult(val token: String, val user: User)
 data class PassResult(val code: String, val expiresAt: String, val qrDataUrl: String)
+data class RoutineExercise(val exerciseId: String, val name: String, val sets: Int, val reps: Int, val restSeconds: Int = 60)
+data class RoutineResult(val id: String, val exercises: List<RoutineExercise> = emptyList())
+data class TrainingSession(val id: String, val exercises: List<RoutineExercise> = emptyList())
+data class Guide(val id: String, val goal: String, val title: String, val sections: List<String> = emptyList())
+data class CoachMember(val memberId: String, val memberName: String, val averageRpe: Double?, val alert: Boolean)
 
 class Api {
     private val gson = Gson()
@@ -35,6 +40,15 @@ class Api {
     suspend fun createPass(token: String): PassResult = request(
         "/api/medical-passes", method = "POST", token = token,
     ).let { gson.fromJson(it, PassEnvelope::class.java).pass }
+
+    suspend fun generateRoutine(token: String): RoutineResult = gson.fromJson(request("/api/me/routines/generate", "POST", token, emptyMap<String, String>()), RoutineEnvelope::class.java).routine
+    suspend fun activeSession(token: String): TrainingSession? = gson.fromJson(request("/api/me/training/sessions/active", token = token), ActiveSessionEnvelope::class.java).session
+    suspend fun startSession(token: String, routineId: String): TrainingSession = gson.fromJson(request("/api/me/training/sessions", "POST", token, mapOf("routineId" to routineId)), SessionEnvelope::class.java).session
+    suspend fun reportFatigue(token: String, routineId: String, level: String): String = request("/api/me/fatigue-reports", "POST", token, mapOf("routineId" to routineId, "level" to level))
+    suspend fun reportDiscomfort(token: String, sessionId: String, exerciseId: String, zone: String): String = request("/api/me/training/sessions/$sessionId/discomfort", "POST", token, mapOf("exerciseId" to exerciseId, "zone" to zone))
+    suspend fun guides(token: String): List<Guide> = gson.fromJson(request("/api/me/nutrition-guides", token = token), GuidesEnvelope::class.java).items
+    suspend fun finishSession(token: String, sessionId: String, rpe: Int): String = request("/api/me/training/sessions/$sessionId/finish", "POST", token, mapOf("rpe" to rpe))
+    suspend fun coachDashboard(token: String): List<CoachMember> = gson.fromJson(request("/api/coach/dashboard", token = token), CoachEnvelope::class.java).items
 
     private suspend fun request(
         path: String,
@@ -71,6 +85,11 @@ class Api {
     private data class MeEnvelope(val user: User)
     private data class PassEnvelope(val pass: PassResult)
     private data class ErrorEnvelope(val error: String?)
+    private data class RoutineEnvelope(val routine: RoutineResult)
+    private data class ActiveSessionEnvelope(val session: TrainingSession?)
+    private data class SessionEnvelope(val session: TrainingSession)
+    private data class GuidesEnvelope(val items: List<Guide>)
+    private data class CoachEnvelope(val items: List<CoachMember>)
 }
 
 class ApiException(message: String) : Exception(message)
