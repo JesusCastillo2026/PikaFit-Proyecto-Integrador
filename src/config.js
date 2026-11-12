@@ -13,7 +13,11 @@ function requiredSecret(name) {
 }
 
 function optionalAesKey(name) {
-  const value = process.env[name] || '';
+  const configured = process.env[name] || '';
+  // .env.example uses this marker; treat it as unset so a fresh local setup
+  // can start without clinical encryption configured. Clinical writes remain
+  // blocked by clinical-crypto.js until a real key is supplied.
+  const value = /^replace-with-/i.test(configured) ? '' : configured;
   if (!value) return null;
   if (!/^[a-f0-9]{64}$/i.test(value)) throw new Error(`${name} debe contener 64 caracteres hexadecimales`);
   return Buffer.from(value, 'hex');
