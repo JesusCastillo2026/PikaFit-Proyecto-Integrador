@@ -2,6 +2,10 @@
 
 PikaFit es una plataforma para administrar usuarios y roles, controlar membresías y facilitar la validación de pases médicos en clínicas afiliadas. Incluye una aplicación web, una aplicación Android y una API conectada a MongoDB.
 
+## Estado de entrega
+
+El repositorio contiene la implementación integrada y el mapa funcional de los cuatro sprints en [`docs/CIERRE_SPRINTS.md`](docs/CIERRE_SPRINTS.md). Las pruebas de dominio se ejecutan sin servicios externos; la suite de integración requiere MongoDB disponible en `127.0.0.1:27018`.
+
 ## Funcionalidades
 
 - Inicio de sesión con correo electrónico o DNI y contraseña.
